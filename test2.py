@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import math
 import copy
+import random
+
 
 def contour_threshold(contour, h_thresh, w_thresh):
     x,y,w,h = cv2.boundingRect(contour)
@@ -26,7 +28,7 @@ def intersects_any(this_edge, list_of_edges):
 
 class Edge:
     def __init__(self, p1, p2):
-        self.p1 = p1
+        self.p1 = p1 #these are tuples (x,y)
         self.p2 = p2
 
     def __eq__(self, other):
@@ -35,6 +37,9 @@ class Edge:
         if self.p1 == other.p2 and self.p2 == other.p1:
             return True
         return False
+
+    def __hash__(self):
+        return hash((self.p1, self.p2))
 
     def intersects(self, line_in):
         a = side_of_line(line_in.p1, self.p1, self.p2)
@@ -63,9 +68,15 @@ def connected(e1, e2, e3):
 def triangulate(list_of_points):
     edges = []
 
+    #draws original contour
     for i in range(len(list_of_points)):
         e = Edge(list_of_points[i-1], list_of_points[i])
         edges.append(e)
+
+    lop_a = copy.deepcopy(list_of_points)
+    random.shuffle(lop_a)
+    lop_b = copy.deepcopy(list_of_points)
+    random.shuffle(lop_b)
 
     for point1 in list_of_points:
         for point2 in list_of_points:
@@ -126,34 +137,28 @@ def can_make_tri(e1, e2, e3):
 
 def break_into_triangles(list_of_edges):
     triangles_list = []
-    img = cv2.pyrDown(cv2.imread("operator.jpg", cv2.IMREAD_UNCHANGED))
-    out = np.zeros((img.shape[0], img.shape[1], 3))
-    imgout = out
 
-    for edge1 in list_of_edges:
+    my_edges = {}
+    for edge in list_of_edges:
+        my_edges[edge] = []
+    
+    for curr_edge in list_of_edges:
+        for maybe_edge in list_of_edges:
+            if curr_edge.connected(maybe_edge):
+                my_edges[curr_edge].append(maybe_edge)
 
-        for edge2 in list_of_edges:
-            if edge2.intersects(edge1) or edge2 == edge1:
-                continue
-            for edge3 in list_of_edges:
-                if edge3.intersects(edge2) or edge3.intersects(edge1) or edge3 == edge1 or edge3 == edge2:
-                    continue
-                if can_make_tri(edge1, edge2, edge3):
-                    #print((edge1.p1, edge1.p2), (edge2.p1, edge2.p2), (edge3.p1, edge3.p2))
-                    t = Triangle(edge1, edge2, edge3)
+    for first_edge in list_of_edges:
+        for second_edge in my_edges[first_edge]:
+            for third_edge in my_edges[second_edge]:
+                if can_make_tri(first_edge, second_edge, third_edge):
+                    t = Triangle(first_edge, second_edge, third_edge)
                     to_add = True
                     for tri in triangles_list:
                         if t == tri:
                             to_add = False
+                            break
                     if to_add:
                         triangles_list.append(t)
-                        """
-                        edge1.draw(imgout, (0, 0, 255))
-                        edge2.draw(imgout, (0, 255, 0))
-                        edge3.draw(imgout, (255, 0, 0))
-                        cv2.imwrite("testimg.jpg", imgout)
-                        """
-                    
     return triangles_list
 
 def find_color(tri_as_cont, image):
@@ -163,21 +168,14 @@ def find_color(tri_as_cont, image):
     color = tuple([int(x) for x in color])
     return color
 
-if __name__ == '__main__':
-    img = cv2.pyrDown(cv2.imread("operator.jpg", cv2.IMREAD_UNCHANGED))
-    out = np.zeros((img.shape[0], img.shape[1], 3))
+def approx_contour_area(contour):
+    x,y,w,h = cv2.boundingRect(contour)
+    return (w * h)
 
-    my_contour = [(10, 10), (50, 100), (10, 250), (250, 210), (500, 250), (300, 130), (500, 10), (400, 40), (300, 10), (200, 50), (100, 20), (50, 10), (33, 20)]
-    """
-    initpoint = contour[0]
-    prevpoint = initpoint
-    for point in contour[1:]:
-        cv2.line(out, prevpoint, point, (255, 0, 255))
-        prevpoint = point
-    cv2.line(out, prevpoint, initpoint, (255, 0, 255))
-    """
-    """
-    img = cv2.pyrDown(cv2.imread("operator.jpg", cv2.IMREAD_UNCHANGED))
+
+
+if __name__ == '__main__':
+    img = cv2.pyrDown(cv2.imread("eotech.jpg", cv2.IMREAD_UNCHANGED))
     out = np.zeros((img.shape[0], img.shape[1], 3))
 
     h_thresh = int(img.shape[0] / 16)
@@ -189,14 +187,14 @@ if __name__ == '__main__':
     contours, hier = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     contours[:] = [c for c in contours if contour_threshold(c, h_thresh, w_thresh)]
 
-    #contours is a python list of numpy 3d arrays (num_points, 1(redund), 2(x, y))
     shapes_coords = []
 
-    #currently this loop does two things: 
-        #first, it breaks complicated contours into approximations and then draws them
-        #second, it takes those approximations and reconstructs them back into contours (in the shapes_contour list)
+    contours = sorted(contours, key=approx_contour_area, reverse=True)
+    
     for cont in contours:
-        epsilon = (1/(h_thresh * w_thresh)) * 1 * cv2.arcLength(cont, True)
+        if approx_contour_area(cont) < ((h_thresh * w_thresh)):
+            continue
+        epsilon = .01 * cv2.arcLength(cont, True)
         approx = cv2.approxPolyDP(cont, epsilon, True)
         init_point = (approx[0,0,0], approx[0,0,1])
         curr_shape_coords = [init_point]
@@ -207,29 +205,24 @@ if __name__ == '__main__':
             else:
                 color = (255, 255, 255)
             curr_point = (approx[i,0,0], approx[i,0,1])
-            #print("###", type(prev_point))
-            #print("###", prev_point)
             cv2.line(out, prev_point, curr_point, color)
             prev_point = curr_point
             if i == len(approx) - 1:
                 cv2.line(out, curr_point, init_point, (0, 0, 255))
             curr_shape_coords.append(curr_point)
         shapes_coords.append(curr_shape_coords)
-    """
-
-    triangles = triangulate(my_contour)
-    #cv2.drawContours(out, triangles, -1, (255, 0, 0))
-    print(type(triangles))
-    print(type(triangles[0]))
-    for t in triangles:
-        print(t.shape)
 
 
-    for i in range(len(triangles)):
-        color = find_color(triangles[i], img)
-        print(color)
-        color = tuple([int(x) for x in color])
-        cv2.drawContours(out, triangles, i, color, thickness=cv2.FILLED)
+    triangles_list = []
+    for shape in shapes_coords:
+        triangles_list.append(triangulate(shape))
+
+    for triangles in triangles_list:
+        for i in range(len(triangles)):
+            color = find_color(triangles[i], img)
+            print(color)
+            color = tuple([int(x) for x in color])
+            cv2.drawContours(out, triangles, i, color, thickness=cv2.FILLED)
 
 
     cv2.imwrite("output2.jpg", out)
