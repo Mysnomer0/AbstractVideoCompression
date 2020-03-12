@@ -191,7 +191,7 @@ def break_into_triangles(list_of_edges):
 if __name__ == '__main__':
 
     #read in our image, init our output image. 
-    img = cv2.pyrDown(cv2.imread("eotech.jpg", cv2.IMREAD_UNCHANGED))
+    img = cv2.pyrDown(cv2.imread("hotel2.jpg", cv2.IMREAD_UNCHANGED))
     out = np.zeros((img.shape[0], img.shape[1], 3))
 
     #thresholds for shape size
