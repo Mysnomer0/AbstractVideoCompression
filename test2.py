@@ -187,14 +187,23 @@ def break_into_triangles(list_of_edges):
                         triangles_list.append(t)
     return triangles_list
 
+def preprocess_image(image):
+    return cv2.GaussianBlur(image, (13,13), 0)
+
 
 if __name__ == '__main__':
 
-    #read in our image, init our output image. 
+    # Read in our image, init our output image. 
     img = cv2.pyrDown(cv2.imread("hotel2.jpg", cv2.IMREAD_UNCHANGED))
+    # Define our output image
     out = np.zeros((img.shape[0], img.shape[1], 3))
 
-    #thresholds for shape size
+    # Preprocess the image
+    img = preprocess_image(img)
+
+    #cv2.imwrite("output.jpg", img)
+    
+    # Thresholds for shape size
     h_thresh = int(img.shape[0] / 16)
     w_thresh = int(img.shape[1] / 32)
     print(img.shape[0], img.shape[1])
@@ -252,5 +261,4 @@ if __name__ == '__main__':
 
     #write output, and we're done. 
     cv2.imwrite("output.jpg", out)
-
     
