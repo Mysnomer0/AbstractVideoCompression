@@ -188,18 +188,27 @@ def break_into_triangles(list_of_edges):
     return triangles_list
 
 def preprocess_image(image):
-    return cv2.GaussianBlur(image, (13,13), 0)
+    return 
 
+def auto_canny(image, sigma=0.33):
+	# compute the median of the single channel pixel intensities
+	v = np.median(image)
+	# apply automatic Canny edge detection using the computed median
+	lower = int(max(0, (1.0 - sigma) * v))
+	upper = int(min(255, (1.0 + sigma) * v))
+	edged = cv2.Canny(image, lower, upper)
+	# return the edged image
+	return edged
 
 if __name__ == '__main__':
 
     # Read in our image, init our output image. 
-    img = cv2.pyrDown(cv2.imread("hotel2.jpg", cv2.IMREAD_UNCHANGED))
+    img = cv2.pyrDown(cv2.imread("hotel.jpg", cv2.IMREAD_UNCHANGED))
     # Define our output image
     out = np.zeros((img.shape[0], img.shape[1], 3))
 
     # Preprocess the image
-    img = preprocess_image(img)
+    #img = preprocess_image(img)
 
     #cv2.imwrite("output.jpg", img)
     
@@ -207,10 +216,19 @@ if __name__ == '__main__':
     h_thresh = int(img.shape[0] / 16)
     w_thresh = int(img.shape[1] / 32)
     print(img.shape[0], img.shape[1])
-    
+
+    # Convert the image to black and white
+    blackAndWhiteImage = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2GRAY)
+    # Do the gaussian filter
+    blurred = cv2.GaussianBlur(blackAndWhiteImage, (5,5), 0)
+    # Find the cannys
+    edges = auto_canny(blurred)
+    print('Found cannys')
     #find the cv2 contours of the image
-    ret, thresh = cv2.threshold(cv2.cvtColor(img.copy(), cv2.COLOR_BGR2GRAY) , 127, 255, cv2.THRESH_BINARY_INV)
-    contours, hier = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    ret, thresh = cv2.threshold(blackAndWhiteImage, 127, 255, cv2.THRESH_BINARY_INV)
+
+    contours, hier = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    #contours, hier = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     #throw away some contours
     contours[:] = [c for c in contours if contour_threshold(c, h_thresh, w_thresh)]
     shapes_coords = []
