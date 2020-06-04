@@ -208,18 +208,30 @@ if __name__ == '__main__':
     # Preprocess the image
     
     # Thresholds for shape size
-    h_thresh = int(img.shape[0] / 4)
-    w_thresh = int(img.shape[1] / 4)
+    h_thresh = int(img.shape[0] / 8)
+    w_thresh = int(img.shape[1] / 8)
     #print(img.shape[0], img.shape[1])
 
     # Convert the image to black and white
     blackAndWhiteImage = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2GRAY)
     # Do the gaussian filter
     blurred = cv2.GaussianBlur(blackAndWhiteImage, (5,5), 0)
+    
+    # Output step 1
+    cv2.imwrite("step1.jpg", blurred)
+
     # Find the cannys
     edges = auto_canny(blurred)
+
     # Find the cv2 contours of the image
     contours, hier = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Output step 2
+    step2Out = out.copy()
+    step3Out = out.copy()
+    cv2.drawContours(step2Out, contours, -1, (0, 255, 0), -1)
+    cv2.imwrite("step2.jpg", step2Out)
+
     #throw away some contours
     contours[:] = [c for c in contours if contour_threshold(c, h_thresh, w_thresh)]
     shapes_coords = []
@@ -246,14 +258,17 @@ if __name__ == '__main__':
             else:
                 color = (255, 255, 255)
             curr_point = (approx[i,0,0], approx[i,0,1])
-            cv2.line(out, prev_point, curr_point, color)
+            cv2.line(step3Out, prev_point, curr_point, color)
             prev_point = curr_point
             if i == len(approx) - 1:
-                cv2.line(out, curr_point, init_point, (0, 0, 255))
+                cv2.line(step3Out, curr_point, init_point, (0, 0, 255))
             #curr_shape_coords is the list of coordinate points for the approximation of the current contour.
             curr_shape_coords.append(curr_point)
         #shapes_coords is the list of lists of coordinate points for the approximation of the current contour. 
         shapes_coords.append(curr_shape_coords)
+
+    # Output step 3
+    cv2.imwrite("step3.jpg", step3Out)
 
     #triangles_list has form: list of lists of numpy 3d numpy arrays 
     triangles_list = []
