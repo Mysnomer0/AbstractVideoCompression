@@ -3,6 +3,7 @@ import numpy as np
 import math
 import copy
 import random
+import sys
 
 #used to determine whether or not a contour is large enough to bother drawing
 def contour_threshold(contour, h_thresh, w_thresh):
@@ -187,10 +188,7 @@ def break_into_triangles(list_of_edges):
                         triangles_list.append(t)
     return triangles_list
 
-def preprocess_image(image):
-    return 
-
-def auto_canny(image, sigma=0.33):
+def auto_canny(image, sigma=0.9):
 	# compute the median of the single channel pixel intensities
 	v = np.median(image)
 	# apply automatic Canny edge detection using the computed median
@@ -203,19 +201,16 @@ def auto_canny(image, sigma=0.33):
 if __name__ == '__main__':
 
     # Read in our image, init our output image. 
-    img = cv2.pyrDown(cv2.imread("hotel.jpg", cv2.IMREAD_UNCHANGED))
+    img = cv2.pyrDown(cv2.imread(sys.argv[1], cv2.IMREAD_UNCHANGED))
     # Define our output image
     out = np.zeros((img.shape[0], img.shape[1], 3))
 
     # Preprocess the image
-    #img = preprocess_image(img)
-
-    #cv2.imwrite("output.jpg", img)
     
     # Thresholds for shape size
-    h_thresh = int(img.shape[0] / 16)
-    w_thresh = int(img.shape[1] / 32)
-    print(img.shape[0], img.shape[1])
+    h_thresh = int(img.shape[0] / 4)
+    w_thresh = int(img.shape[1] / 4)
+    #print(img.shape[0], img.shape[1])
 
     # Convert the image to black and white
     blackAndWhiteImage = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2GRAY)
@@ -223,12 +218,8 @@ if __name__ == '__main__':
     blurred = cv2.GaussianBlur(blackAndWhiteImage, (5,5), 0)
     # Find the cannys
     edges = auto_canny(blurred)
-    print('Found cannys')
-    #find the cv2 contours of the image
-    ret, thresh = cv2.threshold(blackAndWhiteImage, 127, 255, cv2.THRESH_BINARY_INV)
-
+    # Find the cv2 contours of the image
     contours, hier = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    #contours, hier = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     #throw away some contours
     contours[:] = [c for c in contours if contour_threshold(c, h_thresh, w_thresh)]
     shapes_coords = []
@@ -269,14 +260,16 @@ if __name__ == '__main__':
     for shape in shapes_coords:
         triangles_list.append(triangulate(shape))
 
-    #finally, for each list, for each triangle in that list, find its color and draw the triangle. 
+    # Finally, for each list, for each triangle in that list, find its color and draw the triangle. 
+    amountOfTriangles = 0
     for triangles in triangles_list:
         for i in range(len(triangles)):
+            amountOfTriangles = amountOfTriangles + 1
             color = find_color(triangles[i], img)
-            print(color)
+            #print(color)
             color = tuple([int(x) for x in color])
             cv2.drawContours(out, triangles, i, color, thickness=cv2.FILLED)
-
+    print("Triangle count: " + str(amountOfTriangles))
     #write output, and we're done. 
     cv2.imwrite("output.jpg", out)
     
